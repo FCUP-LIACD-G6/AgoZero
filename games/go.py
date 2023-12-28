@@ -446,6 +446,7 @@ class Go:
 
     def legal_actions(self):
         legal =[]
+        legal.append(81)        #ação de dar pass
         for row in range(9):
             for col in range(9):
                 move = (row, col)
@@ -456,6 +457,7 @@ class Go:
                     if current_group_liberties:
                         encoding = self.encode(move)
                         legal.append(encoding)
+        print("açoes legal :)",legal)
         return legal
 
     def expert_action(self):
