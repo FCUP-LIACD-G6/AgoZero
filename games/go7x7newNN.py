@@ -201,7 +201,7 @@ class Go:
         self.current_player = 1 if self.current_player == 2 else 2
         
     def to_play(self):
-        return self.current_player
+        return 0 if self.current_player == 2 else 1
     
     def reset(self):
         self.size = 7
@@ -402,9 +402,9 @@ class Go:
     
 
     def get_observation(self):
-        board_player1 = numpy.where(self.board == 1, 1.0, 0.0)
-        board_player2 = numpy.where(self.board == 2, 1.0, 0.0)
-        board_empty = numpy.where(self.board == 0, 1.0, 0.0)
+        board_player1 = numpy.where(self.board == 1, 1, 0)
+        board_player2 = numpy.where(self.board == 2, 1, 0)
+        board_empty = numpy.where(self.board == 0, 1., 0)
         #print("Observation:\n",numpy.array([board_player1, board_player2, board_empty]))
         return numpy.array([board_player1, board_player2, board_empty])
     
