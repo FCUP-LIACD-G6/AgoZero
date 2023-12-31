@@ -20,7 +20,7 @@ class MuZeroConfig:
         self.stacked_observations = 0  # Number of previous observations and previous actions to add to the current observation
 
         # Evaluate
-        self.muzero_player = 0  # Turn Muzero begins to play (0: MuZero plays first, 1: MuZero plays second)
+        self.muzero_player = 1  # Turn Muzero begins to play (0: MuZero plays first, 1: MuZero plays second)
         self.opponent = "expert"  # Hard coded agent that MuZero faces to assess his progress in multiplayer games. It doesn't influence training. None, "random" or "expert" if implemented in the Game class
 
         ### Self-Play
@@ -206,7 +206,7 @@ class Go:
     def reset(self):
         self.size = 7
         self.board = numpy.zeros((self.size, self.size), dtype="int32")
-        self.current_player = 1
+        self.current_player = 2
         self.pass_count = 0
         self.komi = 5.5
         self.ended = False

@@ -13,9 +13,9 @@ class MuZeroConfig:
         self.seed = 0  # Seed for numpy, torch and the game
         self.max_num_gpus = None  # Fix the maximum number of GPUs to use. It's usually faster to use a single GPU (set it to 1) if it has enough memory. None will use every GPUs available
 
-        ### Game ### 9x9
-        self.observation_shape = (3, 9, 9)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
-        self.action_space = list(range(82))  # Fixed list of all possible actions. You should only edit the length
+        ### Game ### 7x7
+        self.observation_shape = (3, 7, 7)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
+        self.action_space = list(range(50))  # Fixed list of all possible actions. You should only edit the length
         self.players = list(range(2))  # List of players. You should only edit the length - players 0 and 1
         self.stacked_observations = 0  # Number of previous observations and previous actions to add to the current observation
 
@@ -26,7 +26,7 @@ class MuZeroConfig:
         ### Self-Play
         self.num_workers = 1  # Number of simultaneous threads/workers self-playing to feed the replay buffer
         self.selfplay_on_gpu = False
-        self.max_moves = 132  # Maximum number of moves if game is not finished before
+        self.max_moves = 80  # Maximum number of moves if game is not finished before
         self.num_simulations = 200  # Number of future moves self-simulated
         self.discount = 1  # Chronological discount of the reward
         self.temperature_threshold = None  # Number of moves before dropping the temperature given by visit_softmax_temperature_fn to 0 (ie selecting the best action). If None, visit_softmax_temperature_fn is used every time
@@ -40,7 +40,7 @@ class MuZeroConfig:
         self.pb_c_init = 1.25
 
         ### Network
-        self.network = "resnet"  # "resnet" / "fullyconnected"
+        self.network = "fullyconnected"  # "resnet" / "fullyconnected"
         self.support_size = 10  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size. Choose it so that support_size <= sqrt(max(abs(discounted reward)))
         
         # Residual Network
@@ -56,11 +56,11 @@ class MuZeroConfig:
         
         # Fully Connected Network
         self.encoding_size = 32
-        self.fc_representation_layers = []  # Define the hidden layers in the representation network
+        self.fc_representation_layers = [16]  # Define the hidden layers in the representation network
         self.fc_dynamics_layers = [16]  # Define the hidden layers in the dynamics network
         self.fc_reward_layers = [16]  # Define the hidden layers in the reward network
-        self.fc_value_layers = []  # Define the hidden layers in the value network
-        self.fc_policy_layers = []  # Define the hidden layers in the policy network
+        self.fc_value_layers = [16]  # Define the hidden layers in the value network
+        self.fc_policy_layers = [16]  # Define the hidden layers in the policy network
 
         ### Training
         self.results_path = pathlib.Path(__file__).resolve().parents[1] / "results" / pathlib.Path(__file__).stem / datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")  # Path to store the model weights and TensorBoard logs
@@ -82,8 +82,8 @@ class MuZeroConfig:
 
         ### Replay Buffer
         self.replay_buffer_size = 10000  # Number of self-play games to keep in the replay buffer
-        self.num_unroll_steps = 132  # Number of game moves to keep for every batch element
-        self.td_steps = 132  # Number of steps in the future to take into account for calculating the target value
+        self.num_unroll_steps = 80  # Number of game moves to keep for every batch element
+        self.td_steps = 80  # Number of steps in the future to take into account for calculating the target value
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
         self.PER_alpha = 0.5  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
@@ -157,7 +157,7 @@ class Game(AbstractGame):
 
         # Encode the move a1 to range(0,81)
         if move_str.lower() == 'pass':
-            choice = 81
+            choice = 49
         else:
             col = ord(move_str[0].lower()) - ord('a')
             row = int(move_str[1:]) - 1
@@ -180,7 +180,7 @@ class Game(AbstractGame):
         """
         Convert an action to a string representing the action.
         """ 
-        if(action_number == 81):
+        if(action_number == 49):
             return f"pass"
         else:
             action_cords = self.env.decode(action_number)
@@ -190,7 +190,7 @@ class Game(AbstractGame):
 
 class Go:
     def __init__(self):
-        self.size = 9
+        self.size = 7
         self.board = numpy.zeros((self.size, self.size), dtype="int32")
         self.current_player = 2 ### 1W 2B       (black começa)
         self.pass_count = 0
@@ -204,7 +204,7 @@ class Go:
         return 0 if self.current_player == 2 else 1
     
     def reset(self):
-        self.size = 9
+        self.size = 7
         self.board = numpy.zeros((self.size, self.size), dtype="int32")
         self.current_player = 2
         self.pass_count = 0
@@ -410,30 +410,30 @@ class Go:
     
     def decode(self, action):
         '''
-        action range(0,81) to move (x,y)/pass
+        action range(0,49) to move (x,y)/pass
         '''
-        if action == 81 :  # Special case for pass
+        if action == 49 :  # Special case for pass
             return "pass"
         else:
-            row = int(action // 9)  # Use integer division to ensure integer result
-            col = int(action % 9)
+            row = int(action // 7)  # Use integer division to ensure integer result
+            col = int(action % 7)
             move = (row, col)
             return move
 
     def encode(self,move):
         '''
-        move (x,y) to action range(0,81)
+        move (x,y) to action range(0,49)
         '''
         row, col = move
         if move == "pass":
-            return 81 #ultima move?
-        return row*9 + col      #9x9
+            return 49 #ultima move?
+        return row*7 + col      #(0 -> 8),(9->17)8*9 = 72 + 8 = 80
 
     def legal_actions(self):
         legal =[]
-        legal.append(81)        #ação de dar pass
-        for row in range(9):
-            for col in range(9):
+        legal.append(49)        #ação de dar pass
+        for row in range(7):
+            for col in range(7):
                 move = (row, col)
         
                 if self.is_valid_move(move):
@@ -457,7 +457,7 @@ class Go:
         return action
 
     def is_non_suicidal(self, action):
-        if action == 81:  # Special case for pass
+        if action == 49:  # Special case for pass
             return True
         
         row, col = self.decode(action)
