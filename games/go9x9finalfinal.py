@@ -434,7 +434,7 @@ class Go:
         '''
         action range(0,81) to move (x,y)/pass
         '''
-        if action == 49 :  # Special case for pass
+        if action == 81 :  # Special case for pass
             return "pass"
         else:
             row = int(action // 9)  # Use integer division to ensure integer result
