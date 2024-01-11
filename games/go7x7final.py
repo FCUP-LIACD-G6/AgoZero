@@ -65,7 +65,7 @@ class MuZeroConfig:
         ### Training
         self.results_path = pathlib.Path(__file__).resolve().parents[1] / "results" / pathlib.Path(__file__).stem / datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")  # Path to store the model weights and TensorBoard logs
         self.save_model = True  # Save the checkpoint in results_path as model.checkpoint
-        self.training_steps = 1500000  # Total number of training steps (ie weights update according to a batch)
+        self.training_steps = 2000000  # Total number of training steps (ie weights update according to a batch)
         self.batch_size = 64  # Number of parts of games to train on at each training step
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
         self.value_loss_weight = 0.25  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
@@ -295,7 +295,7 @@ class Go:
             if not current_group_liberties:
                 self.board[row][col] = 0  # Revert move
                 print("Suicidal move. Try again.")
-                return
+                self.change_play()  # Switch players only after the move is finalized
             self.pass_count = 0  # Reset pass count to zero
             self.change_play()  # Switch players only after the move is finalized
         else:
@@ -338,6 +338,84 @@ class Go:
         if not current_group_liberties:
             self.board[row][col] = ' '  # Revert move'''
 #########################
+    
+    def get_liberty_coords(self, y, x):
+        '''
+        Return the liberty coordinates for (y, x). This constitutes
+        "up", "down", "left", "right" if possible.
+        '''
+        coords = []
+        if y > 0:
+            coords.append((y-1, x))
+        if y < self.size-1:
+            coords.append((y+1, x))
+        if x > 0:
+            coords.append((y, x-1))
+        if x < self.size-1:
+            coords.append((y, x+1))
+        return coords
+
+    
+    def make_2d_array(self,h, w, default=lambda: None):
+        return [[default() for i in range(w)] for j in range(h)]
+    
+    def get_scores(self):
+        '''
+        Return the score of black and white.
+        Scoring is counted based on territorial rules, with no interpolation of dead/alive groups.
+        An area is a territory for a player if any area within that territory can only reach
+        stones of of that player.
+        '''
+        
+        black =0
+        white =0
+        scores = {black:0, white: 0}
+
+        traversed = self.make_2d_array(self.size, self.size,
+                                  default=lambda: False)
+
+        def traverse(y, x):
+            traversed[y][x] = True
+            search = [(y, x)]
+            stone = None
+            count = 1
+            is_neutral = False
+
+            while search:
+                y, x = search.pop()
+                for ly, lx in self.get_liberty_coords(y, x):
+                    this_stone = self.board[ly, lx]
+                    if this_stone != 0:
+                        stone = stone or this_stone
+                        if stone != this_stone:
+                            is_neutral = True                
+                    if not traversed[ly][lx]:
+                        if this_stone == 0:
+                            count += 1
+                            search.append((ly, lx))
+                    traversed[ly][lx] = True
+
+            if is_neutral:
+                return 0, 0
+            return count, stone
+
+        for y in range(self.size):
+            for x in range(self.size):
+                if not traversed[y][x] and self.board[y, x] == 0:
+                    score, stone = traverse(y, x)
+                    if stone is not None and stone != 0:
+                        if stone == 1:
+                            scores[black] += score
+                        else:
+                            scores[white] += score
+
+        scores[black] -= self.whitecaptured
+        scores[white] -= self.blackcaptured
+
+
+        return scores[black],scores[white]
+
+
 
     def calculate_score(self, scoring_system="territory"):
         black_score, white_score = 0, 0
@@ -373,9 +451,9 @@ class Go:
             for col in range(self.size):
                 if self.board[row][col] == 0:
                     # Check empty points enclosed by a player's stones
-                    if self.is_surrounded((row, col), 1):
+                    if self.is_surrounded((row, col), 2):
                         black_territory += 1
-                    elif self.is_surrounded((row, col), 2):
+                    elif self.is_surrounded((row, col), 1):
                         white_territory += 1
 
 
@@ -383,24 +461,59 @@ class Go:
 
     def is_surrounded(self, position, player):
         # Helper function to check if a group of stones is surrounded
-        visited = set()
+        visited = []
         queue = [position]
 
         while queue:
             row, col = queue.pop()
             if (row, col) in visited:
                 continue
-            visited.add((row, col))
+            visited.append((row, col))
 
             for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                 nr, nc = row + dr, col + dc
                 if 0 <= nr < self.size and 0 <= nc < self.size:
                     if self.board[nr][nc] == 0:
-                        return False  # Group is not completely surrounded
+                        queue.append((nr,nc))  # Group is not completely surrounded
                     elif self.board[nr][nc] == player and (nr, nc) not in visited:
-                        queue.append((nr, nc))
+                        pass     
+                    else :
+                        return False #está surrounded pelo outro player
 
         return True  # Group is completely surrounded
+
+    def is_surrounded_2(self,position, player):
+        if player == 1:
+            enemy = 2
+        else : enemy = 1
+
+        visited = set()
+        queue = [position]
+        row,col = position
+        visited.add((row,col))
+
+        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nr, nc = row + dr, col + dc
+            if 0 <= nr < self.size and 0 <= nc < self.size:             # se ele ta dentro dos boundaries
+                if self.board[nr][nc] == 0 and (nr, nc) not in visited:
+                    visited.add((nr,nc))
+                    queue.append((nr,nc))
+                elif self.board[nr][nc] == enemy:
+                    return False
+                
+        while queue:
+            row, col = queue.pop()
+            for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nr, nc = row + dr, col + dc
+                if 0 <= nr < self.size and 0 <= nc < self.size:
+                    if (nr,nc) in visited or self.board[nr][nc] == player:
+                        pass
+                        
+                        
+    
+        
+        
+        
 
 
     def print_score(self, black_score, white_score):
@@ -409,7 +522,7 @@ class Go:
     
     def have_winner(self):
         # Calculate the score and determine the winner
-        black_score, white_score = self.calculate_score()
+        black_score, white_score = self.get_scores() # :)
         # Announce the winner
         if black_score > white_score:
             winner = 2
