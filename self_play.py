@@ -307,7 +307,7 @@ class SelfPlay:
                     else:
                         print(f"Game ended on a tie! Both players had {r} pieces")
                 elif "G" in Game:
-                    return 1
+                    pass
         client_socket.close()
         return game_history
 
