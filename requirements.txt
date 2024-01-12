@@ -1,0 +1,7 @@
+gymnasium[classic_control]
+nevergrad
+numpy
+ray
+seaborn
+tensorboard
+torch
