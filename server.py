@@ -57,6 +57,43 @@ class Board:
                 col = (int(data[7]))
                 self.board[row][col] = player
                 self.pass_count = 0
+                to_remove = []
+                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nr, nc = row + dr, col + dc
+                    if 0 <= nr < self.size and 0 <= nc < self.size:
+                        if self.board[nr][nc] not in [0, player]:
+                            enemy_group, enemy_liberties = self.find_group(nr, nc)
+                            if not enemy_liberties:
+                                to_remove.append(enemy_group)
+                for group in to_remove:
+                    # Remove the stones of the specified group from the board
+                    counter = 0 
+                    for row, col in group:
+                        self.board[row][col] = 0
+                        counter += 1
+
+    def find_group(self, row, col):
+        # This function will find all connected stones of the same color and their liberties
+        color = self.board[row][col]
+        group = set()
+        liberties = set()
+        queue = [(row, col)]
+
+        while queue:
+            r, c = queue.pop()
+            if (r, c) in group:
+                continue
+            group.add((r, c))
+            for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nr, nc = r + dr, c + dc
+                if 0 <= nr < self.size and 0 <= nc < self.size:
+                    if self.board[nr][nc] == 0:
+                        liberties.add((nr, nc))
+                    elif self.board[nr][nc] == color and (nr, nc) not in group:
+                        queue.append((nr, nc))
+        return group, liberties
+
+            
 
             ###################
             ###################
